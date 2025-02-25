@@ -167,6 +167,10 @@ impl crypto::ServerConfig for NoProtectionServerConfig {
 
         Box::new(NoProtectionSession::new(tls))
     }
+    
+    fn peek_server_name(&self, version: u32, params: &transport_parameters::TransportParameters, client_hello: &[u8]) -> Option<String> {
+        self.inner.peek_server_name(version, params, client_hello)
+    }
 }
 
 // forward all calls to inner except those related to packet encryption/decryption

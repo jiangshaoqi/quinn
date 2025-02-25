@@ -142,6 +142,9 @@ pub trait ServerConfig: Send + Sync {
         version: u32,
         params: &TransportParameters,
     ) -> Box<dyn Session>;
+
+    /// Peek the server name from the client hello
+    fn peek_server_name(&self, version: u32, params: &TransportParameters, client_hello: &[u8]) -> Option<String>;
 }
 
 /// Keys used to protect packet payloads

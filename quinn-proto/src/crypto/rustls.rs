@@ -22,6 +22,8 @@ use crate::{
     ConnectError, ConnectionId, Side, TransportError, TransportErrorCode,
 };
 
+use super::Session;
+
 impl From<Side> for rustls::Side {
     fn from(s: Side) -> Self {
         match s {
@@ -530,6 +532,29 @@ impl crypto::ServerConfig for QuicServerConfig {
         let mut result = [0; 16];
         result.copy_from_slice(tag.as_ref());
         result
+    }
+    
+    fn peek_server_name(&self, version: u32, params: &TransportParameters, client_hello: &[u8]) -> Option<String> {
+        let version = interpret_version(version).unwrap();
+        let mut server_name = None;
+        let mut tls_session = TlsSession {
+            version,
+            got_handshake_data: false,
+            next_secrets: None,
+            inner: rustls::quic::Connection::Server(
+                rustls::quic::ServerConnection::new(self.inner.clone(), version, to_vec(params))
+                    .unwrap(),
+            ),
+            suite: self.initial,
+        };
+        tls_session.read_handshake(client_hello).unwrap();
+        println!("server_name: {:?}", tls_session.handshake_data());
+        if let Some(handshake_data) = tls_session.handshake_data() {
+            if let Some(HandshakeData { server_name: Some(name), .. }) = handshake_data.downcast_ref::<HandshakeData>() {
+                server_name = Some(name.clone());
+            }
+        }
+        server_name
     }
 }
 
