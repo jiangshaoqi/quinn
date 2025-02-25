@@ -9,11 +9,14 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use frame::StreamMetaVec;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use thiserror::Error;
 use tracing::{debug, error, trace, trace_span, warn};
 
 use crate::{
+    Dir, Duration, EndpointConfig, Frame, INITIAL_MTU, Instant, MAX_CID_SIZE, MAX_STREAM_COUNT,
+    MIN_INITIAL_SIZE, Side, StreamId, TIMER_GRANULARITY, TokenStore, Transmit, TransportError,
+    TransportErrorCode, VarInt,
     cid_generator::ConnectionIdGenerator,
     cid_queue::CidQueue,
     coding::BufMutExt,
@@ -31,9 +34,6 @@ use crate::{
     },
     token::{ResetToken, Token, TokenPayload},
     transport_parameters::TransportParameters,
-    Dir, Duration, EndpointConfig, Frame, Instant, Side, StreamId, TokenStore, Transmit,
-    TransportError, TransportErrorCode, VarInt, INITIAL_MTU, MAX_CID_SIZE, MAX_STREAM_COUNT,
-    MIN_INITIAL_SIZE, TIMER_GRANULARITY,
 };
 
 mod ack_frequency;
@@ -1240,6 +1240,13 @@ impl Connection {
         self.update_keys(None, false);
     }
 
+    // Compatibility wrapper for quinn < 0.11.7. Remove for 0.12.
+    #[doc(hidden)]
+    #[deprecated]
+    pub fn initiate_key_update(&mut self) {
+        self.force_key_update();
+    }
+
     /// Get a session reference
     pub fn crypto_session(&self) -> &dyn crypto::Session {
         &*self.crypto
@@ -1675,8 +1682,7 @@ impl Connection {
             self.stats.path.lost_bytes += size_of_lost_packets;
             trace!(
                 "packets lost: {:?}, bytes lost: {}",
-                lost_packets,
-                size_of_lost_packets
+                lost_packets, size_of_lost_packets
             );
 
             for &packet in &lost_packets {
@@ -3910,11 +3916,7 @@ pub enum Event {
 }
 
 fn instant_saturating_sub(x: Instant, y: Instant) -> Duration {
-    if x > y {
-        x - y
-    } else {
-        Duration::ZERO
-    }
+    if x > y { x - y } else { Duration::ZERO }
 }
 
 fn get_max_ack_delay(params: &TransportParameters) -> Duration {
